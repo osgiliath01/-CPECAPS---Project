@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone, timedelta
 from decimal import Decimal
-from typing import List
+from typing import List, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import BaseModel, ConfigDict, field_serializer
 
@@ -13,6 +13,12 @@ class DisbursementCreate(BaseModel):
     amount: Decimal
     encoder_name: str
 
+class DisbursementUpdate(BaseModel):
+    date: Optional[date] = None
+    cv_no: Optional[str] = None
+    payee: Optional[str] = None
+    amount: Optional[float] = None
+    editor_name: str
 
 class DisbursementItemResponse(BaseModel):
     id: int

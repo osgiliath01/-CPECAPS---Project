@@ -43,7 +43,13 @@ def create_disbursement(db: Session, payload: schemas.DisbursementCreate):
     return new_disbursement
 
 
-# def update_disbursement_log(db: Session, )
+def update_disbursement(db: Session, disbursement_id: int, 
+                        payload: schemas.DisbursementUpdate) -> models.Disbursement | None:
+    disbursement = db.get(models.Disbursement,disbursement_id)
+    if not disbursement:
+        return None
+    
+
 
 
 def get_project_summary(db: Session, project_title: str):

@@ -1,16 +1,7 @@
 from typing import Dict
-from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy.orm import Session
 import crud, database, models, schemas
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Auto-creates database tables on startup
-    models.Base.metadata.create_all(bind=database.engine)
-    yield
-
-app = FastAPI(title="Calamba Disbursement API", lifespan=lifespan)
 
 # Create database tables automatically
 models.Base.metadata.create_all(bind=database.engine)

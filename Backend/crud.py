@@ -1,28 +1,40 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, selectinload
 import models, schemas
 
 
 def create_disbursement(db: Session, payload: schemas.DisbursementCreate):
-    # 1. Find existing project by title, or create it if it doesn't exist yet
+    clean_title = payload.project_title.strip()
+
+    # Find existing project or create it
     project = db.scalars(
-        select(models.Project).where(models.Project.title == payload.project_title)
+        select(models.Project).where(
+            func.lower(models.Project.title) == clean_title.lower()
+        )
     ).first()
 
     if not project:
-        project = models.Project(title=payload.project_title)
-        db.add(project)
-        db.flush()  # Assigns project.id immediately
+        try:
+            project = models.Project(title=clean_title)
+            db.add(project)
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            project = db.scalars(
+                select(models.Project).where(
+                    func.lower(models.Project.title) == clean_title.lower()
+                )
+            ).first()
 
-    # 2. Always create a NEW disbursement entry under this project
     new_disbursement = models.Disbursement(
         date=payload.date,
         payee=payload.payee,
         cv_no=payload.cv_no,
         amount=payload.amount,
         project_id=project.id,
-        created_by_id=payload.encoder_id,
-        updated_by_id=payload.encoder_id,
+        created_by=payload.encoder_name,
+        updated_by=payload.encoder_name,
     )
 
     db.add(new_disbursement)
@@ -31,30 +43,22 @@ def create_disbursement(db: Session, payload: schemas.DisbursementCreate):
     return new_disbursement
 
 
+# def update_disbursement_log(db: Session, )
+
+
 def get_project_summary(db: Session, project_title: str):
+
     project = db.scalars(
-        select(models.Project).where(models.Project.title == project_title)
+        select(models.Project)
+        .options(selectinload(models.Project.disbursements))
+        .where(func.lower(models.Project.title) == project_title.strip().lower())
     ).first()
 
     if not project:
         return None
 
-    # Maps all connected disbursement entries under the project title key
     return {
-        project.title: {
-            "entries": [
-                {
-                    "date": d.date.isoformat(),
-                    "payee": d.payee,
-                    "cv_no": d.cv_no,
-                    "amount": float(d.amount),
-                    "created_at": d.created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                    "updated_at": d.updated_at.strftime("%Y-%m-%d %H:%M:%S"),
-                    "created_by": d.created_by.name,
-                    "updated_by": d.updated_by.name,
-                }
-                for d in project.disbursements
-            ],
-            "total_amount": float(project.total_amount),
-        }
+        "project_title": project.title,
+        "total_amount": float(project.total_amount),
+        "entries": project.disbursements,
     }

@@ -1,20 +1,24 @@
-from sqlalchemy import create_engine, event
+import os
+from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-SQL_ALCHEMY_DATABASE_URL = "sqlite:///./disbursements.db"
-
-engine = create_engine(
-    SQL_ALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False, "timeout": 30}
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg://postgres:mysecretpassword@localhost:5432/disbursements_db"
 )
 
-# Enable WAL mode for high concurrency
-@event.listens_for(engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL;")
-    cursor.execute("PRAGMA busy_timeout=10000;")
-    cursor.close()
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+elif DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+psycopg://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=10,
+    max_overflow=20,
+    pool_pre_ping=True,
+    connect_args={"connect_timeout": 5}
+)
 
 SessionLocal = sessionmaker(autoflush=False, autocommit=False, bind=engine)
 Base = declarative_base()

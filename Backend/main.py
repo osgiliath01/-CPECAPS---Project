@@ -21,6 +21,41 @@ def record_disbursement(
     return crud.create_disbursement(db, payload)
 
 
+@app.patch(
+    "/disbursements/{disbursement_id}",
+    response_model=schemas.DisbursementItemResponse,
+)
+def update_disbursement_log(
+    disbursement_id: int,
+    payload: schemas.DisbursementUpdate,
+    db: Session = Depends(database.get_db),
+):
+    """Updates specific fields of an existing disbursement record."""
+    updated_item = crud.update_disbursement(db, disbursement_id, payload)
+    if not updated_item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Disbursement log not found",
+        )
+    return updated_item
+
+@app.delete(
+    "/disbursements/{disbursement_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_disbursement_log(
+    disbursement_id: int, db: Session = Depends(database.get_db)
+):
+    """Deletes a specific disbursement log entry by its ID."""
+    success = crud.delete_disbursement(db, disbursement_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Disbursement log not found",
+        )
+    return None
+
+
 @app.get(
     "/projects/{project_title}/summary",
     response_model=schemas.ProjectSummaryResponse,

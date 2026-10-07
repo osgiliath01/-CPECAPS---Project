@@ -46,10 +46,32 @@ def create_disbursement(db: Session, payload: schemas.DisbursementCreate):
 def update_disbursement(db: Session, disbursement_id: int, 
                         payload: schemas.DisbursementUpdate) -> models.Disbursement | None:
     disbursement = db.get(models.Disbursement,disbursement_id)
+    
     if not disbursement:
         return None
-    
 
+    # extract only those that are changed
+    update_data = payload.model_dump(exclude_unset=True,exclude_none=True)
+
+    # append editor name to updated by
+    if "editor_name" in update_data:
+        disbursement.updated_by = update_data.pop("editor_name")
+
+    for item,value in update_data.items():
+        setattr(disbursement,item,value)
+
+    db.commit()
+    db.refresh(disbursement)
+    return disbursement
+
+def delete_disbursement(db: Session, disbursement_id: int) -> bool:
+    disbursement = db.get(models.Disbursement, disbursement_id)
+    if not disbursement:
+        return False
+
+    db.delete(disbursement)
+    db.commit()
+    return True
 
 
 def get_project_summary(db: Session, project_title: str):

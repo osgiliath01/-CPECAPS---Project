@@ -16,7 +16,6 @@ models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="Calamba Allied Industrial Corporation")
 
-
 # ==========================================
 # AUTHENTICATION & USER ROUTES
 # ==========================================

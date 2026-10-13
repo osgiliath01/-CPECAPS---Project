@@ -105,7 +105,6 @@ class PasswordChangeSchema(BaseModel):
 # JWT Token Schemas
 # ==========================================
 
-
 class Token(BaseModel):
     access_token: str
     token_type: str

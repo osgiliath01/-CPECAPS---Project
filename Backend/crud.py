@@ -1,9 +1,11 @@
 from sqlalchemy import func, select
+from typing import Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
-import models, schemas
+import models,schemas,security
 
 
+# DISBURSEMENT FUNCTIONS
 def create_disbursement(db: Session, payload: schemas.DisbursementCreate):
     clean_title = payload.project_title.strip()
 
@@ -73,11 +75,10 @@ def delete_disbursement(db: Session, disbursement_id: int) -> bool:
     db.commit()
     return True
 
-
 def get_project_summary(db: Session, project_title: str):
 
     project = db.scalars(
-        select(models.Project)
+        select(models.ForeignKeyProject)
         .options(selectinload(models.Project.disbursements))
         .where(func.lower(models.Project.title) == project_title.strip().lower())
     ).first()
@@ -90,3 +91,39 @@ def get_project_summary(db: Session, project_title: str):
         "total_amount": float(project.total_amount),
         "entries": project.disbursements,
     }
+
+# USERS FUNCTIONS
+def create_user(db: Session, user_in: schemas.UserCreate) -> models.User:
+    hashed_pwd = security.get_password_hash(user_in.password)
+    
+    db_user = models.User(
+        username=user_in.username,
+        hashed_password=hashed_pwd,
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+def authenticate_user(db: Session, username: str, password: str) -> Optional[models.User]:
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        return None
+    if not security.verify_password(password, user.hashed_password):
+        return None
+    return user
+
+def change_password(db: Session, username: str, new_password: str) -> models.User:
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        return None
+
+    user.hashed_password = security.get_password_hash(new_password)
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+

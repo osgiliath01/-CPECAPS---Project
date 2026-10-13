@@ -6,7 +6,7 @@ import models,schemas,security
 
 
 # DISBURSEMENT FUNCTIONS
-def create_disbursement(db: Session, payload: schemas.DisbursementCreate):
+def create_disbursement(db: Session, payload: schemas.DisbursementCreate, current_user: models.User):
     clean_title = payload.project_title.strip()
 
     # Find existing project or create it
@@ -35,8 +35,8 @@ def create_disbursement(db: Session, payload: schemas.DisbursementCreate):
         cv_no=payload.cv_no,
         amount=payload.amount,
         project_id=project.id,
-        created_by=models.User.username,
-        updated_by=payload.encoder_name,
+        created_by = f"{current_user.username} | {current_user.name}",
+        updated_by=current_user.name,
     )
 
     db.add(new_disbursement)
@@ -101,6 +101,7 @@ def create_user(db: Session, user_in: schemas.UserCreate) -> models.User:
     hashed_pwd = security.get_password_hash(user_in.password)
     
     db_user = models.User(
+        name=user_in.name,
         username=user_in.username,
         hashed_password=hashed_pwd,
     )

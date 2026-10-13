@@ -17,7 +17,6 @@ class DisbursementCreate(BaseModel):
     payee: str
     date: date
     amount: Decimal
-    encoder_name: str
 
 
 class DisbursementUpdate(BaseModel):

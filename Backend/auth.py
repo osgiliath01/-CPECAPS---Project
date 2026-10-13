@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 import crud
@@ -15,6 +16,13 @@ import security
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="Calamba Allied Industrial Corporation")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins during development
+    allow_credentials=True,
+    allow_methods=["*"],   # Allows GET, POST, PUT, DELETE, OPTIONS, etc.
+    allow_headers=["*"],   # Allows Authorization headers and tokens
+)
 
 # ==========================================
 # AUTHENTICATION & USER ROUTES
@@ -112,7 +120,7 @@ def record_disbursement(
     current_user: models.User = Depends(security.get_current_user),
 ):
     """Appends a new disbursement record to the given project title."""
-    return crud.create_disbursement(db, payload)
+    return crud.create_disbursement(db, payload, current_user)
 
 
 @app.patch(
@@ -127,7 +135,7 @@ def update_disbursement_log(
     current_user: models.User = Depends(security.get_current_user),
 ):
     """Updates specific fields of an existing disbursement record."""
-    updated_item = crud.update_disbursement(db, disbursement_id, payload)
+    updated_item = crud.update_disbursement(db, disbursement_id, payload,current_user)
     if not updated_item:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

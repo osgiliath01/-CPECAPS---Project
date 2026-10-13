@@ -4,13 +4,8 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+psycopg://postgres:caic123@database.nyala-ordinal.ts.net:5432/caic_db")
-
-# Normalize PostgreSQL driver prefix
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
-elif DATABASE_URL.startswith("postgresql://") and not DATABASE_URL.startswith("postgresql+psycopg://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+    "postgresql+psycopg://postgres:caic123@database.nyala-ordinal.ts.net:5432/caic_db"
+)
 
 
 def ensure_database_exists(db_url: str):
@@ -52,8 +47,34 @@ Base = declarative_base()
 
 
 def init_db():
-    """Call this during startup to auto-create all defined tables."""
+    """Call this during startup to auto-create all tables and seed default superadmin."""
     Base.metadata.create_all(bind=engine)
+
+    # Local imports prevent circular dependency errors with models.py
+    import models
+    from auth import get_password_hash  # Adjust module path if get_password_hash lives elsewhere (e.g., core.security)
+
+    db = SessionLocal()
+    try:
+        # Check if a superadmin account already exists
+        superadmin = db.query(models.User).filter(models.User.is_superuser == True).first()
+        
+        if not superadmin:
+            admin_user = models.User(
+                username="admin",
+                name="System Superadmin",
+                hashed_password=get_password_hash("admin123"),  # Change initial password as needed
+                is_active=True,
+                is_superuser=True,
+            )
+            db.add(admin_user)
+            db.commit()
+            print("--> Default Superadmin account seeded: admin / admin123")
+    except Exception as e:
+        db.rollback()
+        print(f"Error seeding default superadmin: {e}")
+    finally:
+        db.close()
 
 
 def get_db():

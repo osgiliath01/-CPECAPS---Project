@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 import database
 import models
 
-SECRET_KEY = "YOUR_SUPER_SECRET_KEY_CHANGE_THIS_IN_PRODUCTION"
+SECRET_KEY = "super_caic1234"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

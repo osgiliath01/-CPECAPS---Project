@@ -93,6 +93,10 @@ def get_project_summary(db: Session, project_title: str):
     }
 
 # USERS FUNCTIONS
+def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
+    """Retrieves a user by their username."""
+    return db.query(models.User).filter(models.User.username == username).first()
+
 def create_user(db: Session, user_in: schemas.UserCreate) -> models.User:
     hashed_pwd = security.get_password_hash(user_in.password)
     

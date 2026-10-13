@@ -1,71 +1,61 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 import database
 import models
 
-# Environment Configuration (Use os.getenv in production)
 SECRET_KEY = "YOUR_SUPER_SECRET_KEY_CHANGE_THIS_IN_PRODUCTION"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# Tells FastAPI where clients send credentials to get tokens (e.g. POST /token)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 # ==========================================
-# Password Utilities
+# Password Utilities (Native Bcrypt)
 # ==========================================
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verifies plain password against stored hash with 72-byte truncation safety."""
+    password_bytes = plain_password.encode("utf-8")[:72]
+    hashed_bytes = hashed_password.encode("utf-8")
+    return bcrypt.checkpw(password_bytes, hashed_bytes)
 
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    """Hashes password using native bcrypt."""
+    password_bytes = password.encode("utf-8")[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password_bytes, salt).decode("utf-8")
 
 
 # ==========================================
-# JWT Utilities
+# JWT Utilities & Current User Dependency
 # ==========================================
 
 
 def create_access_token(
     data: dict, expires_delta: Optional[timedelta] = None
 ) -> str:
-    """Generates a signed JWT access token with an expiration timestamp."""
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(
-            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
-        )
-
+    expire = datetime.now(timezone.utc) + (
+        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
-# ==========================================
-# Authentication Dependency
-# ==========================================
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(database.get_db),
 ) -> models.User:
-    """FastAPI dependency: extracts and verifies JWT from incoming requests, returning the active User model."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -79,7 +69,6 @@ def get_current_user(
     except jwt.PyJWTError:
         raise credentials_exception
 
-    # Directly querying the user model avoids circular imports with crud.py
     user = (
         db.query(models.User).filter(models.User.username == username).first()
     )
@@ -87,7 +76,6 @@ def get_current_user(
         raise credentials_exception
     if not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Inactive user"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
         )
     return user

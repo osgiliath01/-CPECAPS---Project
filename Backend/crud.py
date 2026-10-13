@@ -35,7 +35,7 @@ def create_disbursement(db: Session, payload: schemas.DisbursementCreate):
         cv_no=payload.cv_no,
         amount=payload.amount,
         project_id=project.id,
-        created_by=payload.encoder_name,
+        created_by=models.User.username,
         updated_by=payload.encoder_name,
     )
 
@@ -78,7 +78,7 @@ def delete_disbursement(db: Session, disbursement_id: int) -> bool:
 def get_project_summary(db: Session, project_title: str):
 
     project = db.scalars(
-        select(models.ForeignKeyProject)
+        select(models.Project)
         .options(selectinload(models.Project.disbursements))
         .where(func.lower(models.Project.title) == project_title.strip().lower())
     ).first()

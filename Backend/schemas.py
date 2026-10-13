@@ -68,12 +68,14 @@ class ProjectSummaryResponse(BaseModel):
 
 
 class UserCreate(BaseModel):
+    name: str = Field(..., min_length=3, max_length=50)
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=8, max_length=128)
 
 
 class UserResponse(BaseModel):
     id: int
+    name: str
     username: str
     is_active: bool
     is_superuser: bool

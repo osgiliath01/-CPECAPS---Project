@@ -46,7 +46,8 @@ def create_disbursement(db: Session, payload: schemas.DisbursementCreate, curren
 
 
 def update_disbursement(db: Session, disbursement_id: int, 
-                        payload: schemas.DisbursementUpdate) -> models.Disbursement | None:
+                        payload: schemas.DisbursementUpdate,
+                        current_user: models.User) -> models.Disbursement | None:
     disbursement = db.get(models.Disbursement,disbursement_id)
     
     if not disbursement:
@@ -130,5 +131,4 @@ def change_password(db: Session, username: str, new_password: str) -> models.Use
     db.commit()
     db.refresh(user)
     return user
-
 

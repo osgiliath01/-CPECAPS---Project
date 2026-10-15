@@ -7,7 +7,24 @@ from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_valid
 
 
 # ==========================================
-# Disbursement Schemas
+# PROJECT SCHEMAS
+# ==========================================
+
+
+class ProjectCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+
+
+class ProjectResponse(BaseModel):
+    id: int
+    title: str
+    total_amount: Decimal
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==========================================
+# DISBURSEMENT SCHEMAS
 # ==========================================
 
 
@@ -60,9 +77,11 @@ class ProjectSummaryResponse(BaseModel):
     entries: List[DisbursementItemResponse]
     total_amount: Decimal
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 # ==========================================
-# User & Auth Schemas
+# USER & AUTH SCHEMAS
 # ==========================================
 
 
@@ -103,8 +122,9 @@ class PasswordChangeSchema(BaseModel):
 
 
 # ==========================================
-# JWT Token Schemas
+# JWT TOKEN SCHEMAS
 # ==========================================
+
 
 class Token(BaseModel):
     access_token: str

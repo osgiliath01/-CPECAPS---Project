@@ -9,8 +9,19 @@ const COLUMNS = [
 ];
 
 
-function groupByProject(entries) {
+function groupByProject(entries, projects = []) {
   const map = new Map();
+
+  // every project from the backend, so empty ones still show up
+  for (const p of projects) {
+    map.set(p.title.trim().toLowerCase(), {
+      project_title: p.title,
+      total: 0,
+      payees: [],
+      cvs: [],
+    });
+  }
+
   for (const e of entries) {
     const key = e.project_title.trim().toLowerCase();
     let p = map.get(key);
@@ -25,29 +36,29 @@ function groupByProject(entries) {
   return [...map.values()];
 }
 
-export default function VoucherControl({ entries, loading, q, fields, onNew, onView }) {
+export default function VoucherControl({ entries, projects, loading, q, fields, onNew, onView }) {
   const [sort, setSort] = useState({ key: "project_title", dir: "asc" });
 
-  const projects = useMemo(() => groupByProject(entries), [entries]);
+  const grouped = useMemo(() => groupByProject(entries, projects), [entries, projects]);
 
-  const rows = useMemo(() => {
+    const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const keys = fields.length ? fields : ["project_title", "payee", "cv_no"];
     const list = needle
-      ? projects.filter(
+      ? grouped.filter(
           (p) =>
             (keys.includes("project_title") && p.project_title.toLowerCase().includes(needle)) ||
             (keys.includes("payee") && p.payees.some((x) => x.includes(needle))) ||
             (keys.includes("cv_no") && p.cvs.some((x) => x.includes(needle)))
         )
-      : projects;
+      : grouped;
     const mul = sort.dir === "asc" ? 1 : -1;
     return [...list].sort((a, b) =>
       sort.key === "project_title"
         ? a.project_title.localeCompare(b.project_title, undefined, { numeric: true }) * mul
         : (a.total - b.total) * mul
     );
-  }, [projects, q, fields, sort]);
+  }, [grouped, q, fields, sort]);
 
   const toggleSort = (key) =>
     setSort((s) =>
@@ -128,10 +139,10 @@ export default function VoucherControl({ entries, loading, q, fields, onNew, onV
           onPageSize={pg.setPageSize}
         />
         {loading && <p className="panel-msg">Loading projects…</p>}
-        {!loading && projects.length === 0 && (
+        {!loading && grouped.length === 0 && (
           <p className="panel-msg">No projects yet. Use Create new record or Import File.</p>
         )}
-        {!loading && projects.length > 0 && rows.length === 0 && (
+        {!loading && grouped.length > 0 && rows.length === 0 && (
           <p className="panel-msg">No projects match “{q}”.</p>
         )}
       </section>

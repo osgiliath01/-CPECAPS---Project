@@ -1,9 +1,9 @@
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, List
 
 from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 import crud
@@ -20,8 +20,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows all origins during development
     allow_credentials=True,
-    allow_methods=["*"],   # Allows GET, POST, PUT, DELETE, OPTIONS, etc.
-    allow_headers=["*"],   # Allows Authorization headers and tokens
+    allow_methods=["*"],  # Allows GET, POST, PUT, DELETE, OPTIONS, etc.
+    allow_headers=["*"],  # Allows Authorization headers and tokens
 )
 
 # ==========================================
@@ -92,7 +92,9 @@ def update_password(
     db: Session = Depends(database.get_db),
 ):
     """Changes password for the currently authenticated user."""
-    if not security.verify_password(payload.old_password, current_user.hashed_password):
+    if not security.verify_password(
+        payload.old_password, current_user.hashed_password
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect existing password",
@@ -101,6 +103,45 @@ def update_password(
     return crud.change_password(
         db, username=current_user.username, new_password=payload.new_password
     )
+
+
+# ==========================================
+# PROJECT ROUTES (PROTECTED)
+# ==========================================
+
+
+@app.get(
+    "/projects",
+    response_model=List[schemas.ProjectResponse],
+    tags=["Projects"],
+)
+def read_all_projects(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(security.get_current_user),
+):
+    """Returns a list of all existing projects with calculated totals upon login."""
+    return crud.get_all_projects(db)
+
+
+@app.post(
+    "/projects",
+    response_model=schemas.ProjectResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Projects"],
+)
+def create_project(
+    payload: schemas.ProjectCreate,
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(security.get_current_user),
+):
+    """Allows creating a new project directly without needing an initial disbursement record."""
+    existing_project = crud.get_project_by_title(db, title=payload.title)
+    if existing_project:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Project with this title already exists",
+        )
+    return crud.create_project(db, project_in=payload)
 
 
 # ==========================================
@@ -135,7 +176,9 @@ def update_disbursement_log(
     current_user: models.User = Depends(security.get_current_user),
 ):
     """Updates specific fields of an existing disbursement record."""
-    updated_item = crud.update_disbursement(db, disbursement_id, payload,current_user)
+    updated_item = crud.update_disbursement(
+        db, disbursement_id, payload, current_user
+    )
     if not updated_item:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

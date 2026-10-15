@@ -4,6 +4,7 @@ import VoucherControl from "./ProjectsTable";
 import SummaryOfExpenses from "./SummaryOfExpenses";
 import EntryDialog from "./EntryDialog";
 import PasswordDialog from "./PasswordDialog";
+import CreateProjectDialog from "./ProjectDialog";
 import ChatWidget from "./ChatWidget";
 import logo from "../assets/logo.webp";
 
@@ -13,6 +14,8 @@ const FILTERS = [
 ];
 
 export default function Dashboard({ api, user, onLogout }) {
+  const [projects, setProjects] = useState([]);
+  const [creatingProject, setCreatingProject] = useState(false);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState(null); // null = voucher list, string = project title
@@ -28,7 +31,12 @@ export default function Dashboard({ api, user, onLogout }) {
 
   const loadEntries = useCallback(async () => {
     try {
-      setEntries(await api.listDisbursements());
+      const [rows, projectList] = await Promise.all([
+        api.listDisbursements(),
+        api.listProjects(),
+      ]);
+      setEntries(rows);
+      setProjects(projectList);
       setError("");
     } catch (e) {
       setError(e.message);
@@ -81,8 +89,16 @@ export default function Dashboard({ api, user, onLogout }) {
 
   const refresh = () => Promise.all([loadEntries(), fetchSummary(view)]);
 
+
   const toggleField = (key) =>
     setFields((f) => (f.includes(key) ? f.filter((k) => k !== key) : [...f, key]));
+
+  async function handleCreateProject(title) {
+    await api.createProject(title);
+    await loadEntries();
+    setCreatingProject(false);
+    setToast("Project created.");
+  }
 
   async function handleSave(payload) {
     if (dialog.mode === "create") {
@@ -168,10 +184,11 @@ export default function Dashboard({ api, user, onLogout }) {
         {view === null ? (
           <VoucherControl
             entries={entries}
+            projects={projects}
             loading={loading}
             q={q}
             fields={fields}
-            onNew={() => setDialog({ mode: "create" })}
+            onNew={() => setCreatingProject(true)}
             onView={(e) => setView(e.project_title)}
           />
         ) : summary ? (
@@ -181,7 +198,9 @@ export default function Dashboard({ api, user, onLogout }) {
             q={q}
             onBack={() => setView(null)}
             onNew={() => setDialog({ mode: "create" })}
-            onEdit={(entry) => setDialog({ mode: "edit", entry })}
+            onEdit={(entry) =>
+              setDialog({ mode: "edit", entry: { ...entry, project_title: summary.project_title } })
+            }
             onDelete={handleDelete}
           />
         ) : (
@@ -200,10 +219,17 @@ export default function Dashboard({ api, user, onLogout }) {
           mode={dialog.mode}
           entry={dialog.entry}
           defaultProject={view ?? ""}
-          projectTitles={[...new Set(entries.map((e) => e.project_title))]}
+          projectTitles={projects.map((p) => p.title)}
           user={user}
           onSave={handleSave}
           onClose={() => setDialog(null)}
+        />
+      )}
+
+      {creatingProject && (
+        <CreateProjectDialog
+          onSave={handleCreateProject}
+          onClose={() => setCreatingProject(false)}
         />
       )}
       {pwOpen && (

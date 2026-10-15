@@ -1,5 +1,6 @@
 import { useState } from "react";
 import logo from "../assets/logo.webp";
+import LoginSlideshow from "./LoginSlideshow";
 
 const EMPTY = { name: "", username: "", password: "", confirm: "" };
 
@@ -43,6 +44,7 @@ export default function Login({ onLogin, onRegister }) {
 
   return (
     <main className="login">
+      <LoginSlideshow />
       <header className="login-brand">
         <img src={logo} alt="Calamba Allied Industrial Corporation" className="login-logo" />
       </header>

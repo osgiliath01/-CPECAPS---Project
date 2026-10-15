@@ -2,16 +2,21 @@ import { useState } from "react";
 import { useModal } from "../hooks/useModal";
 import { cents, fmtStamp, todayISO } from "../utils/format";
 
-export default function EntryDialog({ mode, entry, defaultProject, projectTitles, user, onSave, onClose }) {
+export default function EntryDialog({ mode, entry, defaultProject, user, onSave, onClose }) {
   const [ref, dialogProps] = useModal(onClose);
   const [form, setForm] = useState(() =>
     mode === "edit"
-      ? { date: entry.date, cv_no: entry.cv_no, payee: entry.payee, amount: String(entry.amount) }
-      : { project_title: defaultProject, date: todayISO(), cv_no: "", payee: "", amount: "" }
+      ? {
+          project_title: entry.project_title ?? defaultProject ?? "",
+          date: entry.date,
+          cv_no: entry.cv_no,
+          payee: entry.payee,
+          amount: String(entry.amount),
+        }
+      : { project_title: defaultProject ?? "", date: todayISO(), cv_no: "", payee: "", amount: "" }
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const locked = mode === "create" && !!defaultProject;
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   async function submit(e) {
@@ -20,16 +25,11 @@ export default function EntryDialog({ mode, entry, defaultProject, projectTitles
     const amount = Number(form.amount);
     if (!(amount > 0)) return setError("Enter an amount greater than zero.");
 
-    const title = (locked ? defaultProject : form.project_title).trim();
-    if (!locked && projectTitles.some((t) => t.trim().toLowerCase() === title.toLowerCase())) {
-      return setError("A project with this title already exists. Open it from the list and add the record there.");
-    }
-
     setBusy(true);
     try {
       if (mode === "create") {
         await onSave({
-          project_title: title,
+          project_title: defaultProject,
           date: form.date,
           cv_no: form.cv_no.trim(),
           payee: form.payee.trim(),
@@ -63,26 +63,8 @@ export default function EntryDialog({ mode, entry, defaultProject, projectTitles
     <dialog className="dialog" aria-labelledby="entry-title" {...dialogProps}>
       <form onSubmit={submit}>
         <h2 id="entry-title">
-          {mode === "edit" ? "Edit record" : locked ? "Add record" : "Create new project"}
+          {mode === "edit" ? "Edit record" : "Add record"}
         </h2>
-
-        {mode === "create" &&
-          (locked ? (
-            <p className="hint">
-              Adding a record to <strong>{defaultProject}</strong>.
-            </p>
-          ) : (
-            <label>
-              New project title
-              <input
-                value={form.project_title}
-                onChange={set("project_title")}
-                required
-                autoFocus
-              />
-            </label>
-          ))}
-
         <div className="row">
           <label>
             Date

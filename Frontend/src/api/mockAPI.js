@@ -43,63 +43,61 @@ const sameTitle = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
 const now = () => new Date().toISOString();
 
 export function createMockApi() {
+  if (DEMO) return createMockApi();
+  const call = async (path, opts = {}) => {
+    try {
+      return await http(path, { ...opts, token });
+    } catch (e) {
+      if (e.status === 401 && token && onUnauthorized) onUnauthorized();
+      throw e;
+    }
+  };
   return {
-    login: () => delay({ access_token: "demo", token_type: "bearer" }),
-    register: () => delay(DEMO_USER),
-    me: () => delay(DEMO_USER),
-    changePassword: () => delay(DEMO_USER),
+    login: (username, password) =>
+      http(ROUTES.login, { method: "POST", form: { username, password } }),
+    register: (body) => http(ROUTES.register, { method: "POST", body }),
+    me: async () => {
+      const payload = decodeToken(token);
+      const expired = payload?.exp && payload.exp * 1000 < Date.now();
+      if (!payload?.sub || expired) throw new ApiError("Your session has expired.", 401);
+      return { username: payload.sub, name: payload.sub, is_superuser: false };
+    },
+    
+    listProjects: () => call(ROUTES.projects),
 
-    listDisbursements: () => delay(store.map((e) => ({ ...e }))),
-
-    getSummary: (title) => {
-      const entries = store.filter((e) => sameTitle(e.project_title, title));
-      if (entries.length === 0) return Promise.reject(notFound("Project not found"));
-      const total = entries.reduce((s, e) => s + Number(e.amount), 0);
-      return delay({
-        project_title: entries[0].project_title,
-        total_amount: total,
-        entries: entries.map((e) => ({ ...e })),
+    // Lists every project from the backend, then combines their summaries
+    // into one flat list of entries for the Voucher Control table.
+    listDisbursements: async () => {
+      const projects = await call(ROUTES.projects);
+      const results = await Promise.allSettled(
+        projects.map((p) => call(ROUTES.summary(p.title)))
+      );
+      const rows = [];
+      let failure = null;
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") {
+          const title = r.value.project_title || projects[i].title;
+          r.value.entries.forEach((en) => rows.push({ ...en, project_title: title }));
+        } else {
+          failure = r.reason;
+        }
       });
+      if (failure && rows.length === 0 && projects.length > 0) throw failure;
+      return rows;
     },
 
-    createDisbursement: (body) => {
-      // reuse the stored spelling if the project already exists
-      const existing = store.find((e) => sameTitle(e.project_title, body.project_title));
-      const entry = {
-        id: nextId++,
-        project_title: existing ? existing.project_title : body.project_title.trim(),
-        date: body.date,
-        cv_no: body.cv_no,
-        payee: body.payee,
-        amount: Number(body.amount).toFixed(2),
-        created_at: now(),
-        updated_at: now(),
-        created_by: "demo | Demo User",
-        updated_by: "Demo User",
-      };
-      store = [...store, entry];
-      return delay({ ...entry });
-    },
+    getSummary: (title) => call(ROUTES.summary(title)),
 
-    updateDisbursement: (id, body) => {
-      const i = store.findIndex((e) => e.id === id);
-      if (i < 0) return Promise.reject(notFound("Disbursement log not found"));
-      const { editor_name, ...changes } = body;
-      const next = {
-        ...store[i],
-        ...changes,
-        updated_by: editor_name || store[i].updated_by,
-        updated_at: now(),
-      };
-      store = store.map((e, k) => (k === i ? next : e));
-      return delay({ ...next });
-    },
+    createDisbursement: (body) =>
+      call(ROUTES.disbursements, { method: "POST", body }),
 
-    deleteDisbursement: (id) => {
-      if (!store.some((e) => e.id === id))
-        return Promise.reject(notFound("Disbursement log not found"));
-      store = store.filter((e) => e.id !== id);
-      return delay(null);
-    },
+    updateDisbursement: (id, body) =>
+      call(ROUTES.disbursement(id), { method: UPDATE_METHOD, body }),
+
+    deleteDisbursement: (id) => call(ROUTES.disbursement(id), { method: "DELETE" }),
+
+    createProject: (title) => call(ROUTES.projects, { method: "POST", body: { title } }),
+
+    changePassword: (body) => call(ROUTES.password, { method: "POST", body }),
   };
 }

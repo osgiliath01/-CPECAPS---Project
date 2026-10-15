@@ -1,3 +1,4 @@
+import datetime as dt
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List, Optional
@@ -37,7 +38,7 @@ class DisbursementCreate(BaseModel):
 
 
 class DisbursementUpdate(BaseModel):
-    date: Optional[date] = None
+    date: Optional[dt.date] = None
     cv_no: Optional[str] = None
     payee: Optional[str] = None
     amount: Optional[Decimal] = None

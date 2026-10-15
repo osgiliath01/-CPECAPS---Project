@@ -9,6 +9,7 @@ export const ROUTES = {
   login: "/token",
   register: "/auth/register",
   disbursements: "/disbursements/", // trailing slash avoids a 307 redirect
+  projects: "/projects",
   summary: (title) => `/projects/${encodeURIComponent(title)}/summary`,
   disbursement: (id) => `/disbursements/${id}`,
   password: "/users/change-password",
@@ -64,37 +65,6 @@ function decodeToken(t) {
   }
 }
 
-/* The backend has no "list all disbursements" route, so the app remembers the
-   project titles it has seen (created, imported or opened) in this browser and
-   builds the list from each project's summary. */
-const KNOWN_KEY = "projectTitles";
-const knownProjects = {
-  get() {
-    try {
-      const v = JSON.parse(localStorage.getItem(KNOWN_KEY));
-      return Array.isArray(v) ? v : [];
-    } catch {
-      return [];
-    }
-  },
-  save(list) {
-    try {
-      localStorage.setItem(KNOWN_KEY, JSON.stringify(list));
-    } catch {
-      /* storage unavailable */
-    }
-  },
-  add(title) {
-    const t = (title || "").trim();
-    if (!t) return;
-    const list = this.get();
-    if (!list.some((x) => x.toLowerCase() === t.toLowerCase())) this.save([...list, t]);
-  },
-  remove(title) {
-    this.save(this.get().filter((x) => x.toLowerCase() !== title.toLowerCase()));
-  },
-};
-
 export function createApi(token, onUnauthorized) {
   if (DEMO) return createMockApi();
   const call = async (path, opts = {}) => {
@@ -115,40 +85,42 @@ export function createApi(token, onUnauthorized) {
       if (!payload?.sub || expired) throw new ApiError("Your session has expired.", 401);
       return { username: payload.sub, name: payload.sub, is_superuser: false };
     },
-    // The backend only exposes GET /projects/{title}/summary, so the list is
-    // built by combining the summaries of every project this browser knows about.
+    
+    listProjects: () => call(ROUTES.projects),
+
+    // Lists every project from the backend, then combines their summaries
+    // into one flat list of entries for the Voucher Control table.
     listDisbursements: async () => {
-      const titles = knownProjects.get();
-      const results = await Promise.allSettled(titles.map((t) => call(ROUTES.summary(t))));
+      const projects = await call(ROUTES.projects);
+      const results = await Promise.allSettled(
+        projects.map((p) => call(ROUTES.summary(p.title)))
+      );
       const rows = [];
       let failure = null;
       results.forEach((r, i) => {
         if (r.status === "fulfilled") {
-          const title = r.value.project_title || titles[i];
+          const title = r.value.project_title || projects[i].title;
           r.value.entries.forEach((en) => rows.push({ ...en, project_title: title }));
-        } else if (r.reason?.status === 404) {
-          // keep the title so a mismatch stays visible instead of vanishing
-          console.warn(`Summary for "${titles[i]}" returned 404 (Project not found).`);
         } else {
           failure = r.reason;
         }
       });
-      if (failure && rows.length === 0) throw failure;
+      if (failure && rows.length === 0 && projects.length > 0) throw failure;
       return rows;
     },
-    getSummary: async (title) => {
-      const s = await call(ROUTES.summary(title));
-      knownProjects.add(s.project_title || title);
-      return s;
-    },
-    createDisbursement: async (body) => {
-      const created = await call(ROUTES.disbursements, { method: "POST", body });
-      knownProjects.add(body.project_title);
-      return created;
-    },
+
+    getSummary: (title) => call(ROUTES.summary(title)),
+
+    createDisbursement: (body) =>
+      call(ROUTES.disbursements, { method: "POST", body }),
+
     updateDisbursement: (id, body) =>
       call(ROUTES.disbursement(id), { method: UPDATE_METHOD, body }),
+
     deleteDisbursement: (id) => call(ROUTES.disbursement(id), { method: "DELETE" }),
+
+    createProject: (title) => call(ROUTES.projects, { method: "POST", body: { title } }),
+
     changePassword: (body) => call(ROUTES.password, { method: "POST", body }),
   };
 }

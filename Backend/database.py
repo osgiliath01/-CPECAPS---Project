@@ -52,7 +52,7 @@ def init_db():
 
     # Local imports prevent circular dependency errors with models.py
     import models
-    from auth import get_password_hash  # Adjust module path if get_password_hash lives elsewhere (e.g., core.security)
+    from security import get_password_hash  # Adjust module path if get_password_hash lives elsewhere (e.g., core.security)
 
     db = SessionLocal()
     try:
